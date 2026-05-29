@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockWatch — Track & Score</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff;
+      --bg2: #f7f7f5;
+      --bg3: #f0efea;
+      --border: rgba(0,0,0,0.1);
+      --border2: rgba(0,0,0,0.18);
+      --text: #1a1a18;
+      --text2: #6b6b67;
+      --text3: #9c9c97;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --font: 'DM Sans', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --green: #3B6D11; --green-bg: #EAF3DE; --green-text: #27500A;
+      --red: #A32D2D; --red-bg: #FCEBEB; --red-text: #791F1F;
+      --blue: #185FA5; --blue-bg: #E6F1FB; --blue-text: #0C447C;
+      --amber: #854F0B; --amber-bg: #FAEEDA; --amber-text: #633806;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1a; --bg2: #242422; --bg3: #2c2c2a;
+        --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+        --text: #f0efe8; --text2: #a0a09a; --text3: #6b6b66;
+        --green: #97C459; --green-bg: #173404; --green-text: #C0DD97;
+        --red: #F09595; --red-bg: #501313; --red-text: #F7C1C1;
+        --blue: #85B7EB; --blue-bg: #042C53; --blue-text: #B5D4F4;
+        --amber: #EF9F27; --amber-bg: #412402; --amber-text: #FAC775;
+      }
+    }
+    body { font-family: var(--font); background: var(--bg3); color: var(--text); min-height: 100vh; font-size: 14px; }
+    .hidden { display: none !important; }
+    input, select, textarea, button { font-family: var(--font); font-size: 14px; }
+    input, select, textarea {
+      width: 100%; padding: 9px 12px; border: 0.5px solid var(--border2);
+      border-radius: var(--radius); background: var(--bg); color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--text2); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+    textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+    .btn {
+      cursor: pointer; border: 0.5px solid var(--border2); background: var(--bg);
+      color: var(--text); padding: 8px 18px; border-radius: var(--radius);
+      font-size: 13px; font-weight: 500; transition: all 0.15s; display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .btn:hover { background: var(--bg2); }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .btn-primary:hover { opacity: 0.82; background: var(--text); }
+    .btn-danger { border-color: #E24B4A; color: var(--red); }
+    .btn-danger:hover { background: var(--red-bg); }
+    .btn-success { border-color: var(--green); color: var(--green-text); }
+    .btn-success:hover { background: var(--green-bg); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn-icon { padding: 6px 8px; }
+    .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
+    .metric { background: var(--bg2); border-radius: var(--radius); padding: 1rem 1.1rem; }
+    .metric-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+    .metric-value { font-size: 22px; font-weight: 600; line-height: 1; }
+    .tag { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; display: inline-block; }
+    .tag-us { background: var(--blue-bg); color: var(--blue-text); }
+    .tag-in { background: var(--green-bg); color: var(--green-text); }
+    .tag-pending { background: var(--amber-bg); color: var(--amber-text); }
+    .tag-approved { background: var(--green-bg); color: var(--green-text); }
+    .pct { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .pct-pos { color: var(--green); }
+    .pct-neg { color: var(--red); }
+    .pct-na { color: var(--text3); font-weight: 400; }
+    .spinner {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid var(--border2); border-top-color: var(--text2);
+      border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -2px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--text); color: var(--bg); padding: 10px 20px;
+      border-radius: var(--radius); font-size: 13px; z-index: 9999;
+      opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* App shell */
+    .app { max-width: 1140px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+
+    /* Nav */
+    .nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.85rem 0; border-bottom: 0.5px solid var(--border); margin-bottom: 1.75rem;
+    }
+    .nav-brand { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .nav-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .user-pill { font-size: 12px; background: var(--bg2); padding: 5px 12px; border-radius: 20px; color: var(--text2); border: 0.5px solid var(--border); }
+
+    /* Landing */
+    .landing-wrap { max-width: 440px; margin: 4rem auto 0; }
+    .landing-hero { text-align: center; margin-bottom: 2rem; }
+    .landing-hero h1 { font-size: 28px; font-weight: 600; margin-bottom: 6px; }
+    .landing-hero p { font-size: 14px; color: var(--text2); }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 0.5px solid var(--border); margin-bottom: 1.5rem; }
+    .tab { padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -0.5px; transition: color 0.15s; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-bottom-color: var(--text); }
+
+    /* Dashboard panels */
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin-bottom: 1.5rem; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 800px; }
+    th { text-align: left; font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+    td { padding: 11px 10px; border-bottom: 0.5px solid var(--border); color: var(--text); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--bg2); }
+    .ticker-name { font-weight: 500; font-size: 13px; }
+    .ticker-note { font-size: 11px; color: var(--text3); margin-top: 2px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Section title */
+    .section-title { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; }
+
+    /* Avatar */
+    .avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; background: var(--blue-bg); color: var(--blue-text); flex-shrink: 0; }
+
+    /* User row */
+    .user-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 0.5px solid var(--border); }
+    .user-row:last-child { border-bottom: none; }
+
+    /* Leaderboard */
+    .lb-row { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 0.5px solid var(--border); }
+    .lb-row:last-child { border-bottom: none; }
+    .lb-rank { font-size: 20px; font-weight: 600; width: 32px; text-align: center; color: var(--text2); }
+
+    /* Modal */
+    .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1rem; }
+    .modal { background: var(--bg); border-radius: var(--radius-lg); padding: 1.5rem; width: 440px; max-width: 100%; border: 0.5px solid var(--border2); }
+    .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 1.25rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
+    .form-row { display: flex; gap: 10px; }
+    .form-row .form-group { flex: 1; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 0.5rem; }
+
+    /* Empty */
+    .empty { text-align: center; padding: 2.5rem; color: var(--text2); font-size: 13px; }
+
+    /* Refresh info */
+    .refresh-info { font-size: 11px; color: var(--text3); }
+
+    /* All members member card */
+    .member-card { margin-bottom: 1rem; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div id="toast"></div>
+
+  <!-- LANDING -->
+  <div id="screen-landing">
+    <div class="landing-wrap">
+      <div class="landing-hero">
+        <div style="font-size: 40px; margin-bottom: 10px;">📈</div>
+        <h1>StockWatch</h1>
+        <p>Track stocks, keep score with your crew</p>
+      </div>
+      <div class="card">
+        <div class="tabs" style="margin-bottom: 1.25rem;">
+          <div class="tab active" onclick="switchLandingTab('login')" id="ltab-login">Sign in</div>
+          <div class="tab" onclick="switchLandingTab('register')" id="ltab-register">Register</div>
+          <div class="tab" onclick="switchLandingTab('admin')" id="ltab-admin">Admin</div>
+        </div>
+        <div id="landing-login">
+          <div class="form-group"><label>Your name</label><input type="text" id="login-name" placeholder="Enter your registered name" /></div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="loginUser()">Sign in</button>
+        </div>
+        <div id="landing-register" class="hidden">
+          <div class="form-group"><label>Full name</label><input type="text" id="reg-name" placeholder="What should we call you?" /></div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="registerUser()">Request access</button>
+          <p style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center">Sushmith will approve your account</p>
+        </div>
+        <div id="landing-admin" class="hidden">
+          <div class="form-group"><label>Admin PIN</label><input type="password" id="admin-pin" placeholder="Enter admin PIN" /></div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="adminLogin()">Access admin panel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="screen-admin" class="hidden">
+    <div class="nav">
+      <div class="nav-brand"><i class="ti ti-shield-check"></i> Admin panel</div>
+      <div class="nav-right">
+        <button class="btn btn-sm" onclick="showScreen('landing')">Sign out</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:860px">
+      <div class="card">
+        <div class="section-title">Pending approvals</div>
+        <div id="admin-pending"><div class="empty">No pending requests</div></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Approved members</div>
+        <div id="admin-approved"><div class="empty">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="screen-dashboard" class="hidden">
+    <div class="nav">
+      <div class="nav-brand"><span>📈</span> StockWatch</div>
+      <div class="nav-right">
+        <span id="nav-username" class="user-pill"></span>
+        <button class="btn btn-sm" onclick="refreshPrices()" id="refresh-btn"><i class="ti ti-refresh"></i> Refresh</button>
+        <button class="btn btn-sm btn-primary" onclick="openAddModal()"><i class="ti ti-plus"></i> Add stock</button>
+        <button class="btn btn-sm" onclick="showScreen('landing')">Sign out</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('my')" id="tab-my">My watchlist</div>
+      <div class="tab" onclick="switchTab('all')" id="tab-all">All members</div>
+      <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Leaderboard</div>
+    </div>
+
+    <!-- MY WATCHLIST -->
+    <div id="panel-my">
+      <div class="metrics-grid">
+        <div class="metric"><div class="metric-label">Stocks tracked</div><div class="metric-value" id="m-total">—</div></div>
+        <div class="metric"><div class="metric-label">Best pick</div><div class="metric-value pct-pos" id="m-best">—</div></div>
+        <div class="metric"><div class="metric-label">Worst pick</div><div class="metric-value pct-neg" id="m-worst">—</div></div>
+        <div class="metric"><div class="metric-label">Portfolio avg</div><div class="metric-value" id="m-avg">—</div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div class="section-title" style="margin:0">My stocks</div>
+          <span id="last-refresh" class="refresh-info"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Ticker</th><th>Exchange</th><th>Added on</th>
+              <th>Add price</th><th>LTP</th>
+              <th>Since add</th><th>1D</th><th>1W</th><th>1M</th><th>6M</th><th>1Y</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="my-tbody"><tr><td colspan="12"><div class="empty">Add your first stock to get started</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL MEMBERS -->
+    <div id="panel-all" class="hidden">
+      <div id="all-members-wrap"></div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div id="panel-leaderboard" class="hidden">
+      <div class="card" style="max-width:560px">
+        <div class="section-title">Portfolio leaderboard — avg % since add</div>
+        <div id="lb-list"><div class="empty">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD STOCK MODAL -->
+<div id="modal-add" class="modal-bg hidden" onclick="closeBg(event)">
+  <div class="modal">
+    <div class="modal-title">Add stock to watchlist</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Ticker symbol</label>
+        <input type="text" id="add-ticker" placeholder="e.g. RELIANCE, AAPL" oninput="this.value=this.value.toUpperCase()" />
+      </div>
+      <div class="form-group">
+        <label>Exchange</label>
+        <select id="add-exchange">
+          <option value="">Select exchange</option>
+          <optgroup label="🇺🇸 US Markets">
+            <option value="NYSE">NYSE</option>
+            <option value="NASDAQ">NASDAQ</option>
+          </optgroup>
+          <optgroup label="🇮🇳 Indian Markets">
+            <option value="NSE">NSE</option>
+            <option value="BSE">BSE</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Note <span style="font-weight:400;color:var(--text3)">(why are you adding this?)</span></label>
+      <textarea id="add-note" placeholder="e.g. Strong Q3 earnings, bullish on EV play, friend's hot tip..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addStock()" id="add-btn"><i class="ti ti-plus"></i> Add stock</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ehosnifieiwiazzjrgjs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVob3NuaWZpZWl3aWF6empyZ2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzcyMTEsImV4cCI6MjA5NTYxMzIxMX0.-Rb6sJ9JIB5jnctBPJfjiwbzczC0zzwjzf80Pd24KDI';
+const ADMIN_PIN = '1947';
+
+let currentUser = null;
+let priceCache = {};
+
+// ── Supabase helper ──────────────────────────────────────────────────────────
+async function sb(path, opts = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...opts.headers
+    },
+    ...opts
+  });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  return res.json().catch(() => []);
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, dur = 3200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── Screen switching ─────────────────────────────────────────────────────────
+function showScreen(name) {
+  ['landing','admin','dashboard'].forEach(s => {
+    document.getElementById(`screen-${s}`).classList.toggle('hidden', s !== name);
+  });
+}
+
+function switchLandingTab(tab) {
+  ['login','register','admin'].forEach(t => {
+    document.getElementById(`landing-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`ltab-${t}`).classList.toggle('active', t === tab);
+  });
+}
+
+function switchTab(tab) {
+  ['my','all','leaderboard'].forEach(t => {
+    document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab === 'all') loadAllMembers();
+  if (tab === 'leaderboard') loadLeaderboard();
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+async function loginUser() {
+  const name = document.getElementById('login-name').value.trim();
+  if (!name) return toast('Enter your name');
+  try {
+    const users = await sb(`users?name=ilike.${encodeURIComponent(name)}&select=*`);
+    if (!users.length) return toast('Name not found — register first');
+    if (users[0].status === 'pending') return toast('Your account is pending approval from Sushmith ⏳');
+    currentUser = users[0];
+    document.getElementById('nav-username').textContent = currentUser.name;
+    showScreen('dashboard');
+    loadMyWatchlist();
+  } catch(e) { toast('Error signing in — try again'); }
+}
+
+async function registerUser() {
+  const name = document.getElementById('reg-name').value.trim();
+  if (!name) return toast('Enter your name');
+  try {
+    const exists = await sb(`users?name=ilike.${encodeURIComponent(name)}&select=id`);
+    if (exists.length) return toast('Name already taken');
+    await sb('users', { method: 'POST', body: JSON.stringify({ name, status: 'pending' }) });
+    toast('Request sent! Sushmith will approve you 🤙');
+    document.getElementById('reg-name').value = '';
+    switchLandingTab('login');
+  } catch(e) { toast('Error registering — try again'); }
+}
+
+function adminLogin() {
+  const pin = document.getElementById('admin-pin').value;
+  if (pin !== ADMIN_PIN) return toast('Wrong PIN ❌');
+  showScreen('admin');
+  loadAdminPanel();
+}
+
+// ── Admin panel ──────────────────────────────────────────────────────────────
+async function loadAdminPanel() {
+  const users = await sb('users?order=created_at.asc&select=*');
+  const pending = users.filter(u => u.status === 'pending');
+  const approved = users.filter(u => u.status === 'approved');
+
+  const pEl = document.getElementById('admin-pending');
+  pEl.innerHTML = pending.length
+    ? pending.map(u => `
+        <div class="user-row">
+          <div class="avatar">${u.name[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500">${u.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${new Date(u.created_at).toLocaleDateString()}</div>
+          </div>
+          <button class="btn btn-sm btn-success" onclick="approveUser('${u.id}')"><i class="ti ti-check"></i> Approve</button>
+          <button class="btn btn-sm btn-danger" onclick="denyUser('${u.id}')"><i class="ti ti-x"></i></button>
+        </div>`).join('')
+    : '<div class="empty">No pending requests 🎉</div>';
+
+  const aEl = document.getElementById('admin-approved');
+  aEl.innerHTML = approved.length
+    ? approved.map(u => `
+        <div class="user-row">
+          <div class="avatar">${u.name[0].toUpperCase()}</div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:500">${u.name}</div></div>
+          <span class="tag tag-approved">Active</span>
+        </div>`).join('')
+    : '<div class="empty">No approved users yet</div>';
+}
+
+async function approveUser(id) {
+  await sb(`users?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'approved' }) });
+  toast('User approved ✓'); loadAdminPanel();
+}
+
+async function denyUser(id) {
+  if (!confirm('Remove this user request?')) return;
+  await sb(`users?id=eq.${id}`, { method: 'DELETE' });
+  toast('User removed'); loadAdminPanel();
+}
+
+// ── Price fetching ───────────────────────────────────────────────────────────
+function cacheKey(ticker, exchange) {
+  return `${exchange}:${ticker.toUpperCase()}`;
+}
+
+function yahooTicker(ticker, exchange) {
+  const t = ticker.toUpperCase();
+  if (exchange === 'NSE') return `${t}.NS`;
+  if (exchange === 'BSE') return `${t}.BO`;
+  return t;
+}
+
+const pctChange = (old, cur) => (old && cur && old !== 0) ? ((cur - old) / old * 100) : null;
+
+async function fetchYahoo(ticker, exchange) {
+  const yt = yahooTicker(ticker, exchange);
+  const currency = ['NSE','BSE'].includes(exchange) ? 'INR' : 'USD';
+  const yahoUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yt}?interval=1d&range=1y&includePrePost=false`;
+  const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahoUrl)}`;
+  try {
+    const res = await fetch(proxied, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const r = data?.chart?.result?.[0];
+    if (!r) return null;
+    const meta = r.meta;
+    const closes = r.indicators?.quote?.[0]?.close || [];
+    const timestamps = r.timestamp || [];
+    const ltp = meta.regularMarketPrice || meta.previousClose;
+    if (!ltp) return null;
+    const prev = meta.previousClose;
+    const d1 = prev ? pctChange(prev, ltp) : null;
+    const getClose = daysAgo => {
+      const target = Date.now() - daysAgo * 86400000;
+      let best = null, bestDiff = Infinity;
+      for (let i = 0; i < timestamps.length; i++) {
+        if (closes[i] == null) continue;
+        const diff = Math.abs(timestamps[i] * 1000 - target);
+        if (diff < bestDiff) { bestDiff = diff; best = closes[i]; }
+      }
+      return best;
+    };
+    return {
+      ltp, d1,
+      d1w: pctChange(getClose(7), ltp),
+      d1m: pctChange(getClose(30), ltp),
+      d6m: pctChange(getClose(180), ltp),
+      d1y: pctChange(getClose(365), ltp),
+      currency, ts: Date.now()
+    };
+  } catch(e) { console.error('Price fetch error:', e); return null; }
+}
+
+async function fetchPrice(ticker, exchange) {
+  const key = cacheKey(ticker, exchange);
+  if (priceCache[key] && Date.now() - priceCache[key].ts < 15 * 60 * 1000) return priceCache[key];
+  const result = await fetchYahoo(ticker, exchange);
+  if (result) priceCache[key] = result;
+  return result;
+}
+
+function fmtPct(val) {
+  if (val == null || isNaN(val)) return '<span class="pct pct-na">—</span>';
+  const cls = val >= 0 ? 'pct-pos' : 'pct-neg';
+  return `<span class="pct ${cls}">${val >= 0 ? '+' : ''}${val.toFixed(2)}%</span>`;
+}
+
+function fmtPrice(val, currency) {
+  if (!val) return '<span style="color:var(--text3)">—</span>';
+  const sym = currency === 'INR' ? '₹' : '$';
+  return `${sym}${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// ── My watchlist ─────────────────────────────────────────────────────────────
+async function loadMyWatchlist() {
+  const items = await sb(`watchlist?user_id=eq.${currentUser.id}&order=added_at.desc&select=*`);
+  renderTable(items);
+  document.getElementById('last-refresh').textContent = 'Fetching prices…';
+  await Promise.all(items.map(i => fetchPrice(i.ticker, i.exchange)));
+  renderTable(items);
+  updateMetrics(items);
+  document.getElementById('last-refresh').textContent = `Last updated ${new Date().toLocaleTimeString()}`;
+}
+
+function renderTable(items) {
+  const tbody = document.getElementById('my-tbody');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="12"><div class="empty">Add your first stock above — let the debate begin 🔥</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(item => {
+    const p = priceCache[cacheKey(item.ticker, item.exchange)] || {};
+    const sinceAdd = item.added_price && p.ltp ? ((p.ltp - item.added_price) / item.added_price * 100) : null;
+    const exTag = ['NSE','BSE'].includes(item.exchange) ? 'tag-in' : 'tag-us';
+    const addedDate = new Date(item.added_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' });
+    return `<tr>
+      <td>
+        <div class="ticker-name">${item.ticker}</div>
+        ${item.note ? `<div class="ticker-note" title="${item.note}">${item.note}</div>` : ''}
+      </td>
+      <td><span class="tag ${exTag}">${item.exchange}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${addedDate}</td>
+      <td style="font-family:var(--font-mono);font-size:12px">${item.added_price ? fmtPrice(item.added_price, p.currency) : '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:13px;font-weight:500">${p.ltp ? fmtPrice(p.ltp, p.currency) : '<span class="spinner"></span>'}</td>
+      <td>${fmtPct(sinceAdd)}</td>
+      <td>${fmtPct(p.d1)}</td>
+      <td>${fmtPct(p.d1w)}</td>
+      <td>${fmtPct(p.d1m)}</td>
+      <td>${fmtPct(p.d6m)}</td>
+      <td>${fmtPct(p.d1y)}</td>
+      <td><button class="btn btn-sm btn-danger btn-icon" onclick="removeStock('${item.id}')" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+}
+
+function updateMetrics(items) {
+  document.getElementById('m-total').textContent = items.length;
+  const perfs = items.map(i => {
+    const p = priceCache[cacheKey(i.ticker, i.exchange)] || {};
+    return (i.added_price && p.ltp) ? ((p.ltp - i.added_price) / i.added_price * 100) : null;
+  }).filter(v => v != null);
+  if (!perfs.length) return;
+  const best = Math.max(...perfs), worst = Math.min(...perfs);
+  const avg = perfs.reduce((a,b) => a+b, 0) / perfs.length;
+  const fmt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+  document.getElementById('m-best').textContent = fmt(best);
+  document.getElementById('m-worst').textContent = fmt(worst);
+  const avgEl = document.getElementById('m-avg');
+  avgEl.textContent = fmt(avg);
+  avgEl.className = `metric-value ${avg >= 0 ? 'pct-pos' : 'pct-neg'}`;
+}
+
+async function refreshPrices() {
+  const btn = document.getElementById('refresh-btn');
+  btn.innerHTML = '<span class="spinner"></span> Refreshing'; btn.disabled = true;
+  priceCache = {};
+  await loadMyWatchlist();
+  btn.innerHTML = '<i class="ti ti-refresh"></i> Refresh'; btn.disabled = false;
+  toast('Prices updated ✓');
+}
+
+// ── Add / Remove ─────────────────────────────────────────────────────────────
+function openAddModal() { document.getElementById('modal-add').classList.remove('hidden'); }
+function closeModal() { document.getElementById('modal-add').classList.add('hidden'); }
+function closeBg(e) { if (e.target === document.getElementById('modal-add')) closeModal(); }
+
+async function addStock() {
+  const ticker = document.getElementById('add-ticker').value.trim().toUpperCase();
+  const exchange = document.getElementById('add-exchange').value;
+  const note = document.getElementById('add-note').value.trim();
+  if (!ticker || !exchange) return toast('Ticker and exchange are required');
+  const btn = document.getElementById('add-btn');
+  btn.innerHTML = '<span class="spinner"></span> Fetching price…'; btn.disabled = true;
+  try {
+    const price = await fetchPrice(ticker, exchange);
+    const added_price = price?.ltp || null;
+    await sb('watchlist', { method: 'POST', body: JSON.stringify({ user_id: currentUser.id, ticker, exchange, note: note || null, added_price }) });
+    const sym = price?.currency === 'INR' ? '₹' : '$';
+    toast(`${ticker} added${added_price ? ` at ${sym}${added_price.toFixed(2)}` : ''} ✓`);
+    document.getElementById('add-ticker').value = '';
+    document.getElementById('add-exchange').value = '';
+    document.getElementById('add-note').value = '';
+    closeModal();
+    loadMyWatchlist();
+  } catch(e) { toast('Error adding stock — try again'); }
+  btn.innerHTML = '<i class="ti ti-plus"></i> Add stock'; btn.disabled = false;
+}
+
+async function removeStock(id) {
+  if (!confirm('Remove this stock from your watchlist?')) return;
+  await sb(`watchlist?id=eq.${id}`, { method: 'DELETE' });
+  toast('Stock removed');
+  loadMyWatchlist();
+}
+
+// ── All members ──────────────────────────────────────────────────────────────
+async function loadAllMembers() {
+  const el = document.getElementById('all-members-wrap');
+  el.innerHTML = '<div class="empty"><span class="spinner"></span> Loading...</div>';
+  const [users, stocks] = await Promise.all([
+    sb('users?status=eq.approved&select=*'),
+    sb('watchlist?select=*')
+  ]);
+  if (!users.length) { el.innerHTML = '<div class="empty">No members yet</div>'; return; }
+  el.innerHTML = users.map(u => {
+    const uStocks = stocks.filter(s => s.user_id === u.id);
+    return `<div class="card member-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${uStocks.length ? '1rem' : '0'}">
+        <div class="avatar">${u.name[0].toUpperCase()}</div>
+        <div style="font-size:15px;font-weight:600">${u.name}</div>
+        <div style="margin-left:auto;font-size:12px;color:var(--text3)">${uStocks.length} stock${uStocks.length !== 1 ? 's' : ''}</div>
+      </div>
+      ${uStocks.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>Ticker</th><th>Exchange</th><th>Added</th><th>Since add</th><th>Note</th></tr></thead>
+        <tbody>${uStocks.map(s => {
+          const p = priceCache[cacheKey(s.ticker, s.exchange)] || {};
+          const sinceAdd = s.added_price && p.ltp ? ((p.ltp - s.added_price) / s.added_price * 100) : null;
+          const exTag = ['NSE','BSE'].includes(s.exchange) ? 'tag-in' : 'tag-us';
+          return `<tr>
+            <td><span style="font-weight:500">${s.ticker}</span></td>
+            <td><span class="tag ${exTag}">${s.exchange}</span></td>
+            <td style="font-size:12px;color:var(--text2)">${new Date(s.added_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}</td>
+            <td>${fmtPct(sinceAdd)}</td>
+            <td style="font-size:12px;color:var(--text3);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.note || '—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Leaderboard ──────────────────────────────────────────────────────────────
+async function loadLeaderboard() {
+  const el = document.getElementById('lb-list');
+  const [users, stocks] = await Promise.all([
+    sb('users?status=eq.approved&select=*'),
+    sb('watchlist?select=*')
+  ]);
+  const scores = users.map(u => {
+    const uStocks = stocks.filter(s => s.user_id === u.id);
+    const perfs = uStocks.map(s => {
+      const p = priceCache[cacheKey(s.ticker, s.exchange)] || {};
+      return (s.added_price && p.ltp) ? ((p.ltp - s.added_price) / s.added_price * 100) : null;
+    }).filter(v => v != null);
+    return { name: u.name, avg: perfs.length ? perfs.reduce((a,b)=>a+b,0)/perfs.length : null, count: uStocks.length };
+  }).sort((a,b) => (b.avg ?? -9999) - (a.avg ?? -9999));
+
+  const medals = ['🥇','🥈','🥉'];
+  el.innerHTML = scores.map((s, i) => `
+    <div class="lb-row">
+      <div class="lb-rank">${medals[i] || i+1}</div>
+      <div class="avatar">${s.name[0].toUpperCase()}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">${s.name}</div>
+        <div style="font-size:11px;color:var(--text3)">${s.count} stock${s.count !== 1 ? 's' : ''} tracked</div>
+      </div>
+      <div style="text-align:right">
+        ${s.avg != null
+          ? `<div style="font-size:17px;font-weight:600" class="${s.avg >= 0 ? 'pct-pos' : 'pct-neg'}">${s.avg >= 0 ? '+' : ''}${s.avg.toFixed(2)}%</div>
+             <div style="font-size:11px;color:var(--text3)">avg since add</div>`
+          : `<div style="font-size:13px;color:var(--text3)">No data yet</div>`}
+      </div>
+    </div>`).join('');
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (!document.getElementById('modal-add').classList.contains('hidden')) addStock();
+  }
+});
+</script>
+</body>
+</html>
