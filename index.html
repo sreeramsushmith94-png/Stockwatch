@@ -686,6 +686,10 @@ async function loadAllMembers() {
     sb('watchlist?select=*')
   ]);
   if (!users.length) { el.innerHTML = '<div class="empty">No members yet</div>'; return; }
+
+  const unique = [...new Map(stocks.map(s => [cacheKey(s.ticker, s.exchange), s])).values()];
+  await Promise.all(unique.map(s => fetchPrice(s.ticker, s.exchange)));
+
   el.innerHTML = users.map(u => {
     const uStocks = stocks.filter(s => s.user_id === u.id);
     return `<div class="card member-card">
@@ -696,7 +700,7 @@ async function loadAllMembers() {
         <div style="margin-left:auto;font-size:12px;color:var(--text3)">${uStocks.length} stock${uStocks.length !== 1 ? 's' : ''}</div>
       </div>
       ${uStocks.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>Ticker</th><th>Exchange</th><th>Added</th><th>Since add</th><th>Note</th></tr></thead>
+        <thead><tr><th>Ticker</th><th>Exchange</th><th>Added</th><th>Since add</th><th>1D</th><th>1W</th><th>1M</th><th>6M</th><th>1Y</th><th>Note</th></tr></thead>
         <tbody>${uStocks.map(s => {
           const p = priceCache[cacheKey(s.ticker, s.exchange)] || {};
           const sinceAdd = s.added_price && p.ltp ? ((p.ltp - s.added_price) / s.added_price * 100) : null;
@@ -706,6 +710,11 @@ async function loadAllMembers() {
             <td><span class="tag ${exTag}">${s.exchange}</span></td>
             <td style="font-size:12px;color:var(--text2)">${new Date(s.added_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}</td>
             <td>${fmtPct(sinceAdd)}</td>
+            <td>${fmtPct(p.d1)}</td>
+            <td>${fmtPct(p.d1w)}</td>
+            <td>${fmtPct(p.d1m)}</td>
+            <td>${fmtPct(p.d6m)}</td>
+            <td>${fmtPct(p.d1y)}</td>
             <td style="font-size:12px;color:var(--text3);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.note || '—'}</td>
           </tr>`;
         }).join('')}</tbody>
