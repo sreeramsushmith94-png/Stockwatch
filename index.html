@@ -73,6 +73,8 @@
     .tag-in { background: var(--green-bg); color: var(--green-text); }
     .tag-pending { background: var(--amber-bg); color: var(--amber-text); }
     .tag-approved { background: var(--green-bg); color: var(--green-text); }
+    .tag-tra { background: var(--blue-bg); color: var(--blue-text); }
+    .tag-ogfg { background: var(--amber-bg); color: var(--amber-text); }
     .pct { font-size: 12px; font-weight: 600; white-space: nowrap; }
     .pct-pos { color: var(--green); }
     .pct-neg { color: var(--red); }
@@ -194,6 +196,14 @@
         </div>
         <div id="landing-register" class="hidden">
           <div class="form-group"><label>Full name</label><input type="text" id="reg-name" placeholder="What should we call you?" /></div>
+          <div class="form-group">
+            <label>Group</label>
+            <select id="reg-group">
+              <option value="">Select your group</option>
+              <option value="TRA">TRA</option>
+              <option value="OG FG">OG FG</option>
+            </select>
+          </div>
           <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="registerUser()">Request access</button>
           <p style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center">Sushmith will approve your account</p>
         </div>
@@ -392,13 +402,16 @@ async function loginUser() {
 
 async function registerUser() {
   const name = document.getElementById('reg-name').value.trim();
+  const group = document.getElementById('reg-group').value;
   if (!name) return toast('Enter your name');
+  if (!group) return toast('Select your group');
   try {
     const exists = await sb(`users?name=ilike.${encodeURIComponent(name)}&select=id`);
     if (exists.length) return toast('Name already taken');
-    await sb('users', { method: 'POST', body: JSON.stringify({ name, status: 'pending' }) });
+    await sb('users', { method: 'POST', body: JSON.stringify({ name, group, status: 'pending' }) });
     toast('Request sent! Sushmith will approve you 🤙');
     document.getElementById('reg-name').value = '';
+    document.getElementById('reg-group').value = '';
     switchLandingTab('login');
   } catch(e) { toast('Error registering — try again'); }
 }
@@ -423,7 +436,7 @@ async function loadAdminPanel() {
           <div class="avatar">${u.name[0].toUpperCase()}</div>
           <div style="flex:1">
             <div style="font-size:13px;font-weight:500">${u.name}</div>
-            <div style="font-size:11px;color:var(--text3)">${new Date(u.created_at).toLocaleDateString()}</div>
+            <div style="font-size:11px;color:var(--text3)">${u.group || 'No group'} · ${new Date(u.created_at).toLocaleDateString()}</div>
           </div>
           <button class="btn btn-sm btn-success" onclick="approveUser('${u.id}')"><i class="ti ti-check"></i> Approve</button>
           <button class="btn btn-sm btn-danger" onclick="denyUser('${u.id}')"><i class="ti ti-x"></i></button>
@@ -435,7 +448,10 @@ async function loadAdminPanel() {
     ? approved.map(u => `
         <div class="user-row">
           <div class="avatar">${u.name[0].toUpperCase()}</div>
-          <div style="flex:1"><div style="font-size:13px;font-weight:500">${u.name}</div></div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500">${u.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${u.group || ''}</div>
+          </div>
           <span class="tag tag-approved">Active</span>
         </div>`).join('')
     : '<div class="empty">No approved users yet</div>';
@@ -607,6 +623,7 @@ async function loadAllMembers() {
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:${uStocks.length ? '1rem' : '0'}">
         <div class="avatar">${u.name[0].toUpperCase()}</div>
         <div style="font-size:15px;font-weight:600">${u.name}</div>
+        ${groupTag(u.group)}
         <div style="margin-left:auto;font-size:12px;color:var(--text3)">${uStocks.length} stock${uStocks.length !== 1 ? 's' : ''}</div>
       </div>
       ${uStocks.length ? `<div class="table-wrap"><table>
@@ -641,7 +658,7 @@ async function loadLeaderboard() {
       const p = priceCache[cacheKey(s.ticker, s.exchange)] || {};
       return (s.added_price && p.ltp) ? ((p.ltp - s.added_price) / s.added_price * 100) : null;
     }).filter(v => v != null);
-    return { name: u.name, avg: perfs.length ? perfs.reduce((a,b)=>a+b,0)/perfs.length : null, count: uStocks.length };
+    return { name: u.name, group: u.group, avg: perfs.length ? perfs.reduce((a,b)=>a+b,0)/perfs.length : null, count: uStocks.length };
   }).sort((a,b) => (b.avg ?? -9999) - (a.avg ?? -9999));
 
   const medals = ['🥇','🥈','🥉'];
@@ -650,7 +667,10 @@ async function loadLeaderboard() {
       <div class="lb-rank">${medals[i] || i+1}</div>
       <div class="avatar">${s.name[0].toUpperCase()}</div>
       <div style="flex:1">
-        <div style="font-size:14px;font-weight:600">${s.name}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:14px;font-weight:600">${s.name}</span>
+          ${groupTag(s.group)}
+        </div>
         <div style="font-size:11px;color:var(--text3)">${s.count} stock${s.count !== 1 ? 's' : ''} tracked</div>
       </div>
       <div style="text-align:right">
@@ -660,6 +680,12 @@ async function loadLeaderboard() {
           : `<div style="font-size:13px;color:var(--text3)">No data yet</div>`}
       </div>
     </div>`).join('');
+}
+
+function groupTag(group) {
+  if (!group) return '';
+  const cls = group === 'TRA' ? 'tag-tra' : 'tag-ogfg';
+  return `<span class="tag ${cls}">${group}</span>`;
 }
 
 // ── Keyboard shortcuts ───────────────────────────────────────────────────────
