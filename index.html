@@ -269,9 +269,16 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Ticker</th><th>Exchange</th><th>Added on</th>
+              <th onclick="sortBy('ticker')" style="cursor:pointer" id="th-ticker">Ticker <span id="si-ticker"></span></th>
+              <th>Exchange</th>
+              <th onclick="sortBy('added_at')" style="cursor:pointer" id="th-added_at">Added on <span id="si-added_at"></span></th>
               <th>Add price</th><th>LTP</th>
-              <th>Since add</th><th>1D</th><th>1W</th><th>1M</th><th>6M</th><th>1Y</th>
+              <th onclick="sortBy('since')" style="cursor:pointer" id="th-since">Since add <span id="si-since"></span></th>
+              <th onclick="sortBy('d1')" style="cursor:pointer" id="th-d1">1D <span id="si-d1"></span></th>
+              <th onclick="sortBy('d1w')" style="cursor:pointer" id="th-d1w">1W <span id="si-d1w"></span></th>
+              <th onclick="sortBy('d1m')" style="cursor:pointer" id="th-d1m">1M <span id="si-d1m"></span></th>
+              <th onclick="sortBy('d6m')" style="cursor:pointer" id="th-d6m">6M <span id="si-d6m"></span></th>
+              <th onclick="sortBy('d1y')" style="cursor:pointer" id="th-d1y">1Y <span id="si-d1y"></span></th>
               <th></th>
             </tr></thead>
             <tbody id="my-tbody"><tr><td colspan="12"><div class="empty">Add your first stock to get started</div></td></tr></tbody>
@@ -366,6 +373,7 @@ const ADMIN_PIN = '1947';
 let currentUser = null;
 let priceCache = {};
 let currentItems = [];
+let sortKey = null, sortAsc = true;
 
 // ── Supabase helper ──────────────────────────────────────────────────────────
 async function sb(path, opts = {}) {
@@ -560,6 +568,16 @@ function renderTable(items) {
   if (!items.length) {
     tbody.innerHTML = '<tr><td colspan="12"><div class="empty">Add your first stock above — let the debate begin 🔥</div></td></tr>';
     return;
+  }
+  if (sortKey) {
+    items = [...items].sort((a, b) => {
+      const av = getSortVal(a, sortKey), bv = getSortVal(b, sortKey);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const res = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortAsc ? res : -res;
+    });
   }
   tbody.innerHTML = items.map(item => {
     const p = priceCache[cacheKey(item.ticker, item.exchange)] || {};
@@ -794,6 +812,23 @@ async function loadLeaderboard() {
           : `<div style="font-size:13px;color:var(--text3)">No data yet</div>`}
       </div>
     </div>`).join('');
+}
+
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = false; }
+  ['ticker','added_at','since','d1','d1w','d1m','d6m','d1y'].forEach(k => {
+    document.getElementById(`si-${k}`).textContent = '';
+  });
+  document.getElementById(`si-${key}`).textContent = sortAsc ? '↑' : '↓';
+  renderTable(currentItems);
+}
+
+function getSortVal(item, key) {
+  const p = priceCache[cacheKey(item.ticker, item.exchange)] || {};
+  if (key === 'ticker') return item.ticker;
+  if (key === 'added_at') return item.added_at;
+  if (key === 'since') return (item.added_price && p.ltp) ? ((p.ltp - item.added_price) / item.added_price * 100) : null;
+  return p[key] ?? null;
 }
 
 function groupTag(group) {
