@@ -768,7 +768,7 @@ async function loadAllMembers() {
   const el = document.getElementById('all-members-wrap');
   el.innerHTML = '<div class="empty"><span class="spinner"></span> Loading...</div>';
   const [users, stocks] = await Promise.all([
-    sb('users?status=eq.approved&select=*'),
+    sb(`users?status=eq.approved&group=eq.${encodeURIComponent(currentUser.group)}&select=*`),
     sb('watchlist?select=*')
   ]);
   if (!users.length) { el.innerHTML = '<div class="empty">No members yet</div>'; return; }
@@ -813,7 +813,7 @@ async function loadAllMembers() {
 async function loadLeaderboard() {
   const el = document.getElementById('lb-list');
   const [users, stocks] = await Promise.all([
-    sb('users?status=eq.approved&select=*'),
+    sb(`users?status=eq.approved&group=eq.${encodeURIComponent(currentUser.group)}&select=*`),
     sb('watchlist?select=*')
   ]);
   const scores = users.map(u => {
