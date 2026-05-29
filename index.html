@@ -480,6 +480,7 @@ async function loadAdminPanel() {
             <div style="font-size:11px;color:var(--text3)">${u.group || ''}</div>
           </div>
           <span class="tag tag-approved">Active</span>
+          <button class="btn btn-sm btn-danger" onclick="removeUser('${u.id}', '${u.name}')"><i class="ti ti-trash"></i></button>
         </div>`).join('')
     : '<div class="empty">No approved users yet</div>';
 }
@@ -493,6 +494,13 @@ async function denyUser(id) {
   if (!confirm('Remove this user request?')) return;
   await sb(`users?id=eq.${id}`, { method: 'DELETE' });
   toast('User removed'); loadAdminPanel();
+}
+
+async function removeUser(id, name) {
+  if (!confirm(`Remove ${name}? This will also delete all their watchlist entries.`)) return;
+  await sb(`watchlist?user_id=eq.${id}`, { method: 'DELETE' });
+  await sb(`users?id=eq.${id}`, { method: 'DELETE' });
+  toast(`${name} removed`); loadAdminPanel();
 }
 
 // ── Price fetching ───────────────────────────────────────────────────────────
