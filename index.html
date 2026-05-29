@@ -329,11 +329,11 @@
     <div class="form-row">
       <div class="form-group">
         <label>Ticker symbol</label>
-        <input type="text" id="add-ticker" placeholder="e.g. RELIANCE, AAPL" oninput="this.value=this.value.toUpperCase()" />
+        <input type="text" id="add-ticker" placeholder="e.g. RELIANCE, AAPL" oninput="this.value=this.value.toUpperCase();schedulePreview()" />
       </div>
       <div class="form-group">
         <label>Exchange</label>
-        <select id="add-exchange">
+        <select id="add-exchange" onchange="schedulePreview()">
           <option value="">Select exchange</option>
           <optgroup label="🇺🇸 US Markets">
             <option value="NYSE">NYSE</option>
@@ -346,6 +346,7 @@
         </select>
       </div>
     </div>
+    <div id="add-price-preview" style="min-height:20px;margin-bottom:0.75rem;font-size:12px;"></div>
     <div class="form-group">
       <label>Note <span style="font-weight:400;color:var(--text3)">(why are you adding this?)</span></label>
       <textarea id="add-note" placeholder="e.g. Strong Q3 earnings, bullish on EV play, friend's hot tip..."></textarea>
@@ -364,6 +365,7 @@ const ADMIN_PIN = '1947';
 
 let currentUser = null;
 let priceCache = {};
+let currentItems = [];
 
 // ── Supabase helper ──────────────────────────────────────────────────────────
 async function sb(path, opts = {}) {
@@ -544,6 +546,7 @@ function fmtPrice(val, currency) {
 // ── My watchlist ─────────────────────────────────────────────────────────────
 async function loadMyWatchlist() {
   const items = await sb(`watchlist?user_id=eq.${currentUser.id}&order=added_at.desc&select=*`);
+  currentItems = items;
   renderTable(items);
   document.getElementById('last-refresh').textContent = 'Fetching prices…';
   await Promise.all(items.map(i => fetchPrice(i.ticker, i.exchange)));
@@ -619,9 +622,32 @@ async function refreshPrices() {
 }
 
 // ── Add / Remove ─────────────────────────────────────────────────────────────
-function openAddModal() { document.getElementById('modal-add').classList.remove('hidden'); }
+function openAddModal() {
+  document.getElementById('modal-add').classList.remove('hidden');
+  document.getElementById('add-price-preview').innerHTML = '';
+}
 function closeModal() { document.getElementById('modal-add').classList.add('hidden'); }
 function closeBg(e) { if (e.target === document.getElementById('modal-add')) closeModal(); }
+
+let _previewTimer = null;
+function schedulePreview() {
+  clearTimeout(_previewTimer);
+  const ticker = document.getElementById('add-ticker').value.trim();
+  const exchange = document.getElementById('add-exchange').value;
+  const el = document.getElementById('add-price-preview');
+  if (!ticker || !exchange) { el.innerHTML = ''; return; }
+  el.innerHTML = '<span class="spinner"></span>';
+  _previewTimer = setTimeout(async () => {
+    const price = await fetchPrice(ticker, exchange);
+    if (price && price.ltp) {
+      const sym = price.currency === 'INR' ? '₹' : '$';
+      const formatted = price.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      el.innerHTML = `<span style="color:var(--text2)">Current price: </span><span style="font-weight:600;font-family:var(--font-mono)">${sym}${formatted}</span>`;
+    } else {
+      el.innerHTML = `<span style="color:var(--text3)">Price unavailable for ${ticker}</span>`;
+    }
+  }, 600);
+}
 
 // ── Confirm delete ────────────────────────────────────────────────────────────
 let _pendingDeleteId = null;
@@ -667,6 +693,8 @@ async function addStock() {
   const exchange = document.getElementById('add-exchange').value;
   const note = document.getElementById('add-note').value.trim();
   if (!ticker || !exchange) return toast('Ticker and exchange are required');
+  if (currentItems.some(i => i.ticker === ticker && i.exchange === exchange))
+    return toast(`${ticker} is already in your watchlist`);
   const btn = document.getElementById('add-btn');
   btn.innerHTML = '<span class="spinner"></span> Fetching price…'; btn.disabled = true;
   try {
