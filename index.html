@@ -170,6 +170,17 @@
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+    /* Mobile nav */
+    @media (max-width: 580px) {
+      .nav { flex-wrap: wrap; gap: 8px; }
+      .nav-brand { flex: 1; }
+      .nav-right { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+      .nav-right .btn-sm { font-size: 11px; padding: 4px 9px; }
+      .btn-label { display: none; }
+      .app { padding: 0.75rem 1rem 3rem; }
+      .landing-wrap { margin-top: 1.5rem; }
+    }
   </style>
 </head>
 <body>
@@ -241,9 +252,9 @@
       <div class="nav-brand"><span>📈</span> StockWatch</div>
       <div class="nav-right">
         <span id="nav-username" class="user-pill"></span>
-        <button class="btn btn-sm" onclick="refreshPrices()" id="refresh-btn"><i class="ti ti-refresh"></i> Refresh</button>
-        <button class="btn btn-sm btn-primary" onclick="openAddModal()"><i class="ti ti-plus"></i> Add stock</button>
-        <button class="btn btn-sm" onclick="showScreen('landing')">Sign out</button>
+        <button class="btn btn-sm" onclick="refreshPrices()" id="refresh-btn"><i class="ti ti-refresh"></i><span class="btn-label"> Refresh</span></button>
+        <button class="btn btn-sm btn-primary" onclick="openAddModal()"><i class="ti ti-plus"></i><span class="btn-label"> Add stock</span></button>
+        <button class="btn btn-sm" onclick="signOut()"><span class="btn-label">Sign out</span></button>
       </div>
     </div>
 
@@ -431,10 +442,31 @@ async function loginUser() {
     if (!users.length) return toast('Name not found — register first');
     if (users[0].status === 'pending') return toast('Your account is pending approval from Sushmith ⏳');
     currentUser = users[0];
+    localStorage.setItem('sw_user', JSON.stringify(currentUser));
     document.getElementById('nav-username').textContent = currentUser.name;
     showScreen('dashboard');
     loadMyWatchlist();
   } catch(e) { toast('Error signing in — try again'); }
+}
+
+function signOut() {
+  localStorage.removeItem('sw_user');
+  currentUser = null;
+  showScreen('landing');
+}
+
+async function initSession() {
+  const saved = localStorage.getItem('sw_user');
+  if (!saved) return;
+  try {
+    const user = JSON.parse(saved);
+    const users = await sb(`users?id=eq.${user.id}&select=*`);
+    if (!users.length || users[0].status !== 'approved') { localStorage.removeItem('sw_user'); return; }
+    currentUser = users[0];
+    document.getElementById('nav-username').textContent = currentUser.name;
+    showScreen('dashboard');
+    loadMyWatchlist();
+  } catch(e) { localStorage.removeItem('sw_user'); }
 }
 
 async function registerUser() {
@@ -747,13 +779,13 @@ async function loadAllMembers() {
   el.innerHTML = users.map(u => {
     const uStocks = stocks.filter(s => s.user_id === u.id);
     return `<div class="card member-card">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${uStocks.length ? '1rem' : '0'}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.75rem">
         <div class="avatar">${u.name[0].toUpperCase()}</div>
         <div style="font-size:15px;font-weight:600">${u.name}</div>
         ${groupTag(u.group)}
         <div style="margin-left:auto;font-size:12px;color:var(--text3)">${uStocks.length} stock${uStocks.length !== 1 ? 's' : ''}</div>
       </div>
-      ${uStocks.length ? `<div class="table-wrap"><table>
+      ${!uStocks.length ? `<div style="font-size:12px;color:var(--text3);padding:0.25rem 0">No stocks added yet</div>` : `<div class="table-wrap"><table>
         <thead><tr><th>Ticker</th><th>Exchange</th><th>Added</th><th>Since add</th><th>1D</th><th>1W</th><th>1M</th><th>6M</th><th>1Y</th><th>Note</th></tr></thead>
         <tbody>${uStocks.map(s => {
           const p = priceCache[cacheKey(s.ticker, s.exchange)] || {};
@@ -772,7 +804,7 @@ async function loadAllMembers() {
             <td style="font-size:12px;color:var(--text3);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.note || '—'}</td>
           </tr>`;
         }).join('')}</tbody>
-      </table></div>` : ''}
+      </table></div>`}
     </div>`;
   }).join('');
 }
@@ -839,11 +871,14 @@ function groupTag(group) {
 
 // ── Keyboard shortcuts ───────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') { closeModal(); closeEditModal(); closeConfirm(); }
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
     if (!document.getElementById('modal-add').classList.contains('hidden')) addStock();
+    if (!document.getElementById('modal-edit').classList.contains('hidden')) saveEdit();
   }
 });
+
+initSession();
 </script>
 </body>
 </html>
