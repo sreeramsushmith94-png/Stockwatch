@@ -257,8 +257,8 @@
     <div id="panel-my">
       <div class="metrics-grid">
         <div class="metric"><div class="metric-label">Stocks tracked</div><div class="metric-value" id="m-total">—</div></div>
-        <div class="metric"><div class="metric-label">Best pick</div><div class="metric-value pct-pos" id="m-best">—</div></div>
-        <div class="metric"><div class="metric-label">Worst pick</div><div class="metric-value pct-neg" id="m-worst">—</div></div>
+        <div class="metric"><div class="metric-label">Best pick</div><div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:2px" id="m-best-ticker">—</div><div class="metric-value pct-pos" id="m-best"></div></div>
+        <div class="metric"><div class="metric-label">Worst pick</div><div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:2px" id="m-worst-ticker">—</div><div class="metric-value pct-neg" id="m-worst"></div></div>
         <div class="metric"><div class="metric-label">Portfolio avg</div><div class="metric-value" id="m-avg">—</div></div>
       </div>
       <div class="card">
@@ -291,6 +291,33 @@
         <div class="section-title">Portfolio leaderboard — avg % since add</div>
         <div id="lb-list"><div class="empty">Loading...</div></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE MODAL -->
+<div id="modal-confirm" class="modal-bg hidden" onclick="if(event.target===this)closeConfirm()">
+  <div class="modal" style="width:360px">
+    <div class="modal-title">Remove stock</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Are you sure you want to remove this stock from your watchlist? This can't be undone.</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()"><i class="ti ti-trash"></i> Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT NOTE MODAL -->
+<div id="modal-edit" class="modal-bg hidden" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal">
+    <div class="modal-title">Edit note</div>
+    <div class="form-group">
+      <label>Note <span style="font-weight:400;color:var(--text3)">(why are you watching this?)</span></label>
+      <textarea id="edit-note" placeholder="e.g. Strong Q3 earnings, bullish on EV play..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()"><i class="ti ti-check"></i> Save</button>
     </div>
   </div>
 </div>
@@ -543,7 +570,12 @@ function renderTable(items) {
       <td>${fmtPct(p.d1m)}</td>
       <td>${fmtPct(p.d6m)}</td>
       <td>${fmtPct(p.d1y)}</td>
-      <td><button class="btn btn-sm btn-danger btn-icon" onclick="removeStock('${item.id}')" title="Remove"><i class="ti ti-trash"></i></button></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-icon" onclick="openEditModal('${item.id}', ${JSON.stringify(item.note || '')})" title="Edit note"><i class="ti ti-pencil"></i></button>
+          <button class="btn btn-sm btn-danger btn-icon" onclick="openConfirmDelete('${item.id}')" title="Remove"><i class="ti ti-trash"></i></button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -552,14 +584,18 @@ function updateMetrics(items) {
   document.getElementById('m-total').textContent = items.length;
   const perfs = items.map(i => {
     const p = priceCache[cacheKey(i.ticker, i.exchange)] || {};
-    return (i.added_price && p.ltp) ? ((p.ltp - i.added_price) / i.added_price * 100) : null;
+    const pct = (i.added_price && p.ltp) ? ((p.ltp - i.added_price) / i.added_price * 100) : null;
+    return pct != null ? { ticker: i.ticker, pct } : null;
   }).filter(v => v != null);
   if (!perfs.length) return;
-  const best = Math.max(...perfs), worst = Math.min(...perfs);
-  const avg = perfs.reduce((a,b) => a+b, 0) / perfs.length;
+  perfs.sort((a, b) => b.pct - a.pct);
+  const best = perfs[0], worst = perfs[perfs.length - 1];
+  const avg = perfs.reduce((a, b) => a + b.pct, 0) / perfs.length;
   const fmt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
-  document.getElementById('m-best').textContent = fmt(best);
-  document.getElementById('m-worst').textContent = fmt(worst);
+  document.getElementById('m-best-ticker').textContent = best.ticker;
+  document.getElementById('m-best').textContent = fmt(best.pct);
+  document.getElementById('m-worst-ticker').textContent = worst.ticker;
+  document.getElementById('m-worst').textContent = fmt(worst.pct);
   const avgEl = document.getElementById('m-avg');
   avgEl.textContent = fmt(avg);
   avgEl.className = `metric-value ${avg >= 0 ? 'pct-pos' : 'pct-neg'}`;
@@ -578,6 +614,45 @@ async function refreshPrices() {
 function openAddModal() { document.getElementById('modal-add').classList.remove('hidden'); }
 function closeModal() { document.getElementById('modal-add').classList.add('hidden'); }
 function closeBg(e) { if (e.target === document.getElementById('modal-add')) closeModal(); }
+
+// ── Confirm delete ────────────────────────────────────────────────────────────
+let _pendingDeleteId = null;
+function openConfirmDelete(id) {
+  _pendingDeleteId = id;
+  document.getElementById('modal-confirm').classList.remove('hidden');
+}
+function closeConfirm() {
+  _pendingDeleteId = null;
+  document.getElementById('modal-confirm').classList.add('hidden');
+}
+async function confirmDelete() {
+  if (!_pendingDeleteId) return;
+  const id = _pendingDeleteId;
+  closeConfirm();
+  await sb(`watchlist?id=eq.${id}`, { method: 'DELETE' });
+  toast('Stock removed');
+  loadMyWatchlist();
+}
+
+// ── Edit note ─────────────────────────────────────────────────────────────────
+let _editId = null;
+function openEditModal(id, note) {
+  _editId = id;
+  document.getElementById('edit-note').value = note || '';
+  document.getElementById('modal-edit').classList.remove('hidden');
+}
+function closeEditModal() {
+  _editId = null;
+  document.getElementById('modal-edit').classList.add('hidden');
+}
+async function saveEdit() {
+  if (!_editId) return;
+  const note = document.getElementById('edit-note').value.trim();
+  await sb(`watchlist?id=eq.${_editId}`, { method: 'PATCH', body: JSON.stringify({ note: note || null }) });
+  toast('Note updated ✓');
+  closeEditModal();
+  loadMyWatchlist();
+}
 
 async function addStock() {
   const ticker = document.getElementById('add-ticker').value.trim().toUpperCase();
@@ -601,12 +676,6 @@ async function addStock() {
   btn.innerHTML = '<i class="ti ti-plus"></i> Add stock'; btn.disabled = false;
 }
 
-async function removeStock(id) {
-  if (!confirm('Remove this stock from your watchlist?')) return;
-  await sb(`watchlist?id=eq.${id}`, { method: 'DELETE' });
-  toast('Stock removed');
-  loadMyWatchlist();
-}
 
 // ── All members ──────────────────────────────────────────────────────────────
 async function loadAllMembers() {
